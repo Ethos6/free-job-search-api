@@ -1,0 +1,31 @@
+name: Live check
+
+# Searches the real job sources end to end. Runs weekly and on demand; it is not part of
+# the required checks because outside websites can be slow or down.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    services:
+      search:
+        image: ghcr.io/ethos6/free-search-api:latest
+        ports:
+          - 8001:8000
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Search real sources
+        env:
+          JOBS_SEARCH_URL: http://localhost:8001
+          LIVE_BOARDS: "80"
+        run: python scripts/live_check.py
