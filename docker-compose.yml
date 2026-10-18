@@ -1,0 +1,20 @@
+# Job search API + your own free web search engine (FreeSearch API).
+services:
+  jobs:
+    build: .
+    container_name: jobsearch
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      JOBS_SEARCH_URL: http://search:8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    depends_on:
+      - search
+
+  search:
+    image: ghcr.io/ethos6/free-search-api:latest
+    container_name: freesearch
+    restart: unless-stopped

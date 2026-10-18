@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "free-job-search-api"
+version = "0.1.0"
+description = "Your own free job search API. Describe the job you want in plain words or upload your CV, and get the best matching jobs from company career boards, public job boards and the web. Web page and MCP server included."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Ethos6" }]
+keywords = ["jobs", "job-search", "job-search-api", "jobs-api", "resume", "cv", "career", "greenhouse", "lever", "ashby", "remote-jobs", "mcp", "ai-agents", "self-hosted"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Office/Business",
+]
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "httpx>=0.27",
+  "lxml>=5.0",
+  "pydantic>=2.6",
+  "python-multipart>=0.0.9",
+  "pdfminer.six>=20231228",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.10"]
+web = ["free-search-api @ git+https://github.com/Ethos6/free-search-api"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "respx>=0.21", "ruff>=0.5", "mcp>=1.10"]
+
+[project.scripts]
+jobsearch = "jobsearch.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Ethos6/free-job-search-api"
+Issues = "https://github.com/Ethos6/free-job-search-api/issues"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["jobsearch"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["B008", "E501", "E741", "B904"]
