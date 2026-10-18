@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: ruff check jobsearch tests
+      - run: pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t jobsearch:ci .
+      - run: |
+          docker run -d --name js -p 8000:8000 -e JOBS_BACKGROUND=0 jobsearch:ci
+          for i in $(seq 1 30); do curl -sf localhost:8000/healthz && break; sleep 1; done
+          curl -sf localhost:8000/ | grep -q "Find jobs"
+          curl -sf "localhost:8000/v1/understand" -H 'content-type: application/json' \
+            -d '{"requirements":"nurse in Berlin"}' | grep -q '"nurse"'
