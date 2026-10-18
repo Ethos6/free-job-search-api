@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Free Job Search</title>
+  <meta name="description" content="Describe the job you want in your own words, or upload your CV, and get the best matching jobs from across the web. Free and open source.">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/"><img src="/static/icon.svg" alt="" width="28" height="28"><span>Free Job Search</span></a>
+    <nav><a href="/docs">API</a><a href="https://github.com/Ethos6/free-job-search-api" rel="noopener">GitHub</a></nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Tell us the job you want.<br><span>We search the web for it.</span></h1>
+      <p class="lead">Write a few lines in your own words, upload your CV, or both. Free, no sign-up.</p>
+    </section>
+
+    <form id="form" class="card ask" autocomplete="off">
+      <label for="req" class="label">What are you looking for?</label>
+      <textarea id="req" rows="5" maxlength="6000" placeholder="Example: Backend developer, 5 years with Python and Django. Remote in Europe or hybrid in Berlin. At least €75k. Full-time. No crypto or gambling companies."></textarea>
+
+      <div class="row">
+        <div class="field grow">
+          <label for="loc" class="label">Location <span class="muted">(optional)</span></label>
+          <input id="loc" type="text" maxlength="200" placeholder="e.g. Berlin, remote, Bangalore">
+        </div>
+        <div class="field grow">
+          <span class="label">Your CV <span class="muted">(optional)</span></span>
+          <label class="drop" id="drop" for="cv">
+            <input id="cv" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain">
+            <span id="cv-name">Upload PDF, Word or text</span>
+            <button type="button" id="cv-clear" class="link" hidden>Remove</button>
+          </label>
+        </div>
+      </div>
+      <p class="hint">Your CV is read in memory and never stored or sent to job sites.</p>
+
+      <div class="actions">
+        <button class="btn primary" id="go" type="submit">Find jobs</button>
+        <span id="status" class="muted" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+
+    <section id="understood" class="card understood" hidden>
+      <div class="understood-head">
+        <h2>How we understood you</h2>
+        <button class="btn small" id="save" type="button">Get alerts for new matches</button>
+      </div>
+      <div id="chips" class="chips"></div>
+    </section>
+
+    <section id="results" class="results" aria-live="polite"></section>
+
+    <details id="sources" class="card sources" hidden>
+      <summary>Where these jobs came from</summary>
+      <ul id="source-list"></ul>
+    </details>
+  </main>
+
+  <footer class="foot">
+    <p>Open source (MIT). Jobs link to the original posting; each source is credited.
+      Not affiliated with any job board or employer.</p>
+  </footer>
+
+  <dialog id="dlg">
+    <form method="dialog" id="dlg-form">
+      <h2>Get new matches automatically</h2>
+      <p class="muted">We re-run this search and collect new jobs in a private RSS feed. Add a webhook URL to get them pushed to your app (Slack, Discord, Zapier, ...).</p>
+      <label class="label" for="every">How often</label>
+      <select id="every"><option value="12">Twice a day</option><option value="24" selected>Daily</option><option value="72">Every 3 days</option><option value="168">Weekly</option></select>
+      <label class="label" for="hook">Webhook URL <span class="muted">(optional)</span></label>
+      <input id="hook" type="url" maxlength="500" placeholder="https://hooks.example.com/...">
+      <div id="dlg-out"></div>
+      <div class="actions end">
+        <button class="btn" value="cancel" id="dlg-cancel">Close</button>
+        <button class="btn primary" id="dlg-ok" value="default">Create alert</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/static/app.js"></script>
+</body>
+</html>
