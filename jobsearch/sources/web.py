@@ -53,6 +53,18 @@ NOT_JOB_PAGES = re.compile(r"(^|\.)(youtube\.com|reddit\.com|quora\.com|wikipedi
                            r"x\.com|instagram\.com|tiktok\.com|medium\.com|pinterest\.[a-z.]+)$", re.I)
 
 
+# What a single posting's address looks like on the big job sites (not their search pages).
+POSTING_URL = re.compile(
+    r"linkedin\.com/jobs/view/|indeed\.[a-z.]+/(viewjob|rc/clk|pagead/clk|m/viewjob)|[?&]jk=[0-9a-f]+|"
+    r"glassdoor\.[a-z.]+/(job-listing/|partner/joblisting)|ziprecruiter\.[a-z.]+/(c/[^/]+/job/|jobs/[^/?]+/[^/?]+)|"
+    r"monster\.[a-z.]+/job-openings/|naukri\.com/job-listings-|seek\.com\.au/job/\d|seek\.co\.nz/job/\d|"
+    r"stepstone\.[a-z.]+/stellenangebote--|reed\.co\.uk/jobs/[^/]+/\d+|totaljobs\.com/job/|xing\.com/jobs/[^/]+-\d+|"
+    r"simplyhired\.[a-z.]+/job/|dice\.com/job-detail/|wellfound\.com/jobs/\d|foundit\.in/job/|bayt\.com/[a-z]+/job/|"
+    r"jobstreet\.[a-z.]+/job/\d|careerbuilder\.com/job/", re.I)
+LISTING_TITLE = re.compile(r"^\s*[\d,.]+\+?\s|\bjobs?\b[^|]{0,40}\b(in|near|at)\s+[A-Z]|\b(jobs|stellenangebote|"
+                           r"vacancies|openings)\b\s*(\(|\||-|,|$)|\bjobs,?\s+(employment|hiring)", re.I)
+
+
 def board_from_url(url: str) -> Optional[tuple[str, str]]:
     for ats, pat in ATS_PATTERNS:
         m = pat.match(url)
@@ -176,9 +188,10 @@ def job_from_result(r: dict, source: Source) -> Optional[Job]:
     if not title:
         return None
     host = urlparse(r.get("url", "")).hostname or ""
-    if not re.search(r"/(jobs?|viewjob|job-listing|rc/clk|position|vacanc|stellenangebote|job-detail)", r.get("url", ""),
-                     re.I):
-        return None  # a search page or a company page, not a posting
+    if not POSTING_URL.search(r.get("url", "")):
+        return None  # a search page or a company page, not a single posting
+    if LISTING_TITLE.search(title):
+        return None  # "246 Registered Nurse jobs in Berlin" is a list of jobs, not a job
     site = BIG_SITES.search(host)
     site_name = (site.group(2).split(".")[0].title() if site else host)
     clean = re.split(r"\s+[-|–]\s+(?:LinkedIn|Indeed|Glassdoor|ZipRecruiter|Monster|Naukri|SEEK|StepStone|Reed|"
@@ -200,6 +213,7 @@ class WebSearch(Source):
     terms = "Uses your own FreeSearch API (JOBS_SEARCH_URL) or the freesearch library."
     max_pages = 8
     max_new_boards = 3
+    page_budget = 7.0  # seconds to spend reading pages and new boards during one search
 
     def available(self, ctx: Context) -> Optional[str]:
         reason = super().available(ctx)
@@ -291,11 +305,16 @@ class WebSearch(Source):
             await asyncio.to_thread(ctx.store.replace_jobs, f"{ats}:{token}", found)
             return found
 
-        tasks = [read_page(u) for u in pages[: self.max_pages]] + \
-                [read_board(a, t) for a, t in new_boards[: self.max_new_boards]]
-        for batch in await asyncio.gather(*tasks, return_exceptions=True):
-            if isinstance(batch, list):
-                jobs += batch
+        tasks = [asyncio.ensure_future(read_page(u)) for u in pages[: self.max_pages]] + \
+                [asyncio.ensure_future(read_board(a, t)) for a, t in new_boards[: self.max_new_boards]]
+        if tasks:
+            # whatever isn't read in time is left for next time (boards are indexed in the background anyway)
+            done, pending = await asyncio.wait(tasks, timeout=self.page_budget)
+            for t in pending:
+                t.cancel()
+            for t in done:
+                if not t.cancelled() and t.exception() is None and isinstance(t.result(), list):
+                    jobs += t.result()
         return jobs
 
 
