@@ -35,7 +35,9 @@ def test_remote_rules():
     assert score(req, job(work_mode="onsite")) is None
     assert score(req, job(work_mode="remote", remote_regions=["US"], countries=[])) is None  # US residents only
     ok = score(req, job(work_mode="remote", remote_regions=[], countries=[]))
-    assert ok and any("worldwide" in r for r in ok.reasons)
+    assert ok and any("doesn't say where" in w for w in ok.warnings)  # region unknown: kept, flagged
+    anywhere = score(req, job(work_mode="remote", location="Remote - Worldwide", remote_regions=[], countries=[]))
+    assert anywhere and any("worldwide" in r for r in anywhere.reasons) and anywhere.score > ok.score
 
 
 def test_seniority_and_salary_conversion():
