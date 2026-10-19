@@ -5,10 +5,10 @@ UI tests. Every source answers with the sample responses in tests/fixtures.py.
 """
 import asyncio
 import json
-from contextlib import asynccontextmanager
 import re
 import sys
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx

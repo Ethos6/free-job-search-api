@@ -55,3 +55,28 @@ def test_repeats_collapse_and_one_company_cannot_fill_the_list():
     companies = [m.job.company for m in out]
     assert companies.count("GitLab") == 1 and len(out[companies.index("GitLab")].job.also_on) == 2
     assert companies[:4].count("Jobgether") <= 2 and "Acme" in companies
+
+
+def test_job_site_search_pages_are_not_jobs():
+    from jobsearch.sources import ALL
+    from jobsearch.sources.web import job_from_result
+    pages = [("246 Registered Nurse jobs in Berlin", "https://de.linkedin.com/jobs/registered-nurse-jobs-berlin"),
+             ("Registered Nurse: 704 Jobs - Stellenangebote in Berlin | StepStone",
+              "https://www.stepstone.de/jobs/registered-nurse/in-berlin")]
+    for title, url in pages:
+        assert job_from_result({"title": title, "url": url}, ALL["web"]) is None
+    real = job_from_result({"title": "Registered Nurse - Charité - Berlin | LinkedIn",
+                            "url": "https://de.linkedin.com/jobs/view/registered-nurse-at-charite-4012345678"}, ALL["web"])
+    assert real and real.title == "Registered Nurse" and real.company == "Charité"
+
+
+def test_remote_guesses_are_dropped():
+    nurse = parse("Registered nurse in Berlin, Germany.")
+    unknown_region = job(title="Nurse Practitioner", location="Remote - East", work_mode="remote", description="nursing")
+    assert score(nurse, unknown_region) is None  # they never asked for remote
+    designer = parse("Product designer, Figma, London or remote UK.")
+    sydney = job(title="Senior UX Designer", location="Sydney, Australia / Remote", countries=["AU"])
+    assert score(designer, sydney) is None
+    anywhere = parse("Machine learning engineer, PyTorch, remote anywhere")
+    office = job(title="Machine Learning Engineer", location="Amsterdam", countries=["NL"], description="PyTorch")
+    assert score(anywhere, office) is None

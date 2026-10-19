@@ -113,6 +113,10 @@ def place_fit(req: Requirements, job: Job) -> tuple[Optional[float], Optional[st
         check = {home} if home else want_countries
         if allowed and check and not (allowed & check):
             return None, None, None  # remote, but only for people living elsewhere
+        worldwide = any(w in job.location.lower() for w in vocab.WORLDWIDE_WORDS)
+        if not allowed and not wanted_modes and check and not worldwide:
+            # they named a place and didn't ask for remote; a remote job of unknown region is a guess
+            return None, None, None
         if allowed and not check:
             return 0.8, "Remote", f"Remote only for people in: {_names(allowed)}"
         where = f" ({_names(allowed)})" if allowed and len(allowed) <= 6 else " (worldwide)" if not allowed else ""
@@ -123,8 +127,8 @@ def place_fit(req: Requirements, job: Job) -> tuple[Optional[float], Optional[st
     if req.remote_only:
         if mode in ("onsite", "hybrid"):
             return None, None, None
-        if job.countries and (home or want_countries) and not (set(job.countries) & ({home} | want_countries)):
-            return None, None, None  # probably an office job in another country
+        if job.countries:
+            return None, None, None  # a job tied to a place, with no sign it is remote
         return 0.3, None, "Work mode not stated; may not be remote"
     if wanted_modes and mode and mode not in wanted_modes:
         if not (mode == "hybrid" and "onsite" in wanted_modes):
@@ -145,7 +149,7 @@ def place_fit(req: Requirements, job: Job) -> tuple[Optional[float], Optional[st
                                                          if cities else None)
     if not job_c and not loc.strip():
         return 0.4, None, "Location not stated"
-    if "remote" in wanted_modes and mode is None and re.search(r"remote", loc):
+    if "remote" in wanted_modes and mode is None and re.search(r"remote", loc) and not job_c:
         return 0.9, "Remote", None
     return None, None, None
 
