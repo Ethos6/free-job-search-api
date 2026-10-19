@@ -47,8 +47,8 @@ async def main() -> int:
                 j = m.job
                 print(f"   {m.score:5.1f}  {j.title[:60]} | {j.company[:30]} | {j.location[:40]} | {j.source_name}")
                 print(f"          {j.url}")
-            print("   sources: " + ", ".join(f"{x.id}={x.jobs if x.ok and not x.skipped else (x.skipped or x.error)}"
-                                           for x in res.sources) + "\n")
+            print("   sources: " + ", ".join(f"{x.id}={x.jobs if x.ok and not x.skipped else 'off' if x.skipped else x.error}"
+                                           f"({x.elapsed_ms}ms)" for x in res.sources) + "\n")
         cv = Path(__file__).resolve().parent.parent / "tests" / "cv_sample.pdf"
         req = await js.understand(cv_text=extract_text(cv.read_bytes(), "cv.pdf"), location="remote")
         res = await js.search(req, limit=5)
