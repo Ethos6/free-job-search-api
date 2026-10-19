@@ -80,3 +80,20 @@ def test_remote_guesses_are_dropped():
     anywhere = parse("Machine learning engineer, PyTorch, remote anywhere")
     office = job(title="Machine Learning Engineer", location="Amsterdam", countries=["NL"], description="PyTorch")
     assert score(anywhere, office) is None
+
+
+def test_states_and_provinces_are_not_countries():
+    from jobsearch.normalize import countries_in
+    assert countries_in("Sydney, Australia / Sydney, New South Wales, Australia") == ["AU"]
+    assert countries_in("Jersey City, NJ") == ["US"] and countries_in("New Mexico, US") == ["US"]
+    assert countries_in("Atlanta, Georgia") == ["US"] and countries_in("Tbilisi, Georgia") == ["GE"]
+    assert countries_in("Paris, Texas") == ["US"] and countries_in("Toronto, Ontario") == ["CA"]
+    designer = parse("Product designer, Figma, London or remote UK.")
+    sydney = job(title="Senior UX Designer", location="Sydney, Australia",
+                 countries=countries_in("Sydney, Australia / Sydney, New South Wales, Australia"))
+    assert score(designer, sydney) is None
+
+
+def test_city_alias_or_remote():
+    req = parse("Junior data analyst in New York or remote US. SQL, Excel, Tableau.")
+    assert set(req.work_modes) == {"remote", "hybrid", "onsite"}
