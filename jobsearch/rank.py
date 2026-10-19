@@ -121,6 +121,9 @@ def place_fit(req: Requirements, job: Job) -> tuple[Optional[float], Optional[st
             return 0.8, "Remote", f"Remote only for people in: {_names(allowed)}"
         where = f" ({_names(allowed)})" if allowed and len(allowed) <= 6 else " (worldwide)" if not allowed else ""
         fit = 1.0 if (not wanted_modes or "remote" in wanted_modes) else 0.7
+        if not allowed and check and not worldwide:
+            # "Flexible / Remote": may or may not be open to where they live
+            return fit * 0.5, "Remote", "The posting doesn't say where remote applicants may live"
         return fit, f"Remote{where}", None
 
     # on-site, hybrid or unknown
@@ -139,6 +142,8 @@ def place_fit(req: Requirements, job: Job) -> tuple[Optional[float], Optional[st
     loc = job.location.lower()
     cities = [p for p in req.places if p.kind == "city"]
     for c in cities:
+        if c.country and job_c and c.country not in job_c:
+            continue  # "East Berlin, Pennsylvania" is not Berlin
         if _contains(loc, c.name.lower()) or any(_contains(loc, a) for a, m in vocab.places()["city_aliases"].items()
                                                  if m == c.name.lower()):
             label = "Hybrid" if mode == "hybrid" else "On-site"
