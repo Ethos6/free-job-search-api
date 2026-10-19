@@ -68,6 +68,27 @@ def work_mode(*texts: Optional[str], remote_flag: Optional[bool] = None) -> Opti
     return None
 
 
+_US_STATES = ("alabama alaska arizona arkansas california colorado connecticut delaware florida georgia hawaii idaho "
+              "illinois indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan minnesota "
+              "mississippi missouri montana nebraska nevada ohio oklahoma oregon pennsylvania tennessee texas utah "
+              "vermont virginia wisconsin wyoming").split() + [
+    "new hampshire", "new jersey", "new mexico", "new york state", "north carolina", "north dakota",
+    "rhode island", "south carolina", "south dakota", "west virginia", "washington state", "washington, d.c.",
+    "jersey city", "district of columbia", "new england", "washington"]
+STATES: dict[str, str] = {s: "US" for s in _US_STATES}
+STATES.update({s: "CA" for s in ("ontario", "quebec", "québec", "british columbia", "alberta", "manitoba",
+                                 "saskatchewan", "nova scotia", "new brunswick", "newfoundland",
+                                 "prince edward island")})
+STATES.update({s: "AU" for s in ("new south wales", "queensland", "tasmania", "south australia",
+                                 "western australia", "northern territory", "australian capital territory")})
+STATES.update({s: "IN" for s in ("karnataka", "maharashtra", "tamil nadu", "telangana", "kerala", "gujarat",
+                                 "uttar pradesh", "west bengal", "haryana", "andhra pradesh")})
+STATES.update({"bavaria": "DE", "bayern": "DE", "north rhine-westphalia": "DE", "baden-württemberg": "DE",
+               "england": "GB", "scotland": "GB", "northern ireland": "GB"})
+_STATE_RE = re.compile(r"(?<![\w-])(" + "|".join(re.escape(s) for s in sorted(STATES, key=len, reverse=True))
+                       + r")(?![\w-])")
+
+
 def countries_in(text: Optional[str]) -> list[str]:
     """ISO codes of countries named (or implied by a known city or region) in a location string."""
     if not text:
@@ -76,6 +97,14 @@ def countries_in(text: Optional[str]) -> list[str]:
     names = vocab.country_names()
     data = vocab.places()
     low = text.lower()
+    us_context = bool(re.search(r"\b(US|USA|U\.S\.A?\.?)\b|united states|america", text, re.I))
+    for m in _STATE_RE.finditer(low):
+        state = m.group(1)
+        if state == "georgia" and not (us_context or re.search(r"atlanta|savannah|augusta", low)):
+            continue  # the country
+        if STATES[state] not in found:
+            found.append(STATES[state])
+        low = low[:m.start(1)] + " " * len(state) + low[m.end(1):]  # "New South Wales" is not Wales
     for m in vocab.alias_pattern(list(names)).finditer(low):
         code = names[m.group(1)]
         if code not in found:

@@ -145,8 +145,10 @@ def parse(text: str) -> Requirements:
     req.work_modes = _work_modes(text)
     if req.work_modes == ["remote"] and not REMOTE_ONLY.search(text) and any(p.kind == "city" for p in req.places):
         # "London or remote UK", "Berlin, remote is fine": a city named next to remote means both are fine
+        aliases = vocab.places()["city_aliases"]
         for p in (p for p in req.places if p.kind == "city"):
-            city = re.escape(p.name)
+            names = [p.name] + [a for a, c in aliases.items() if c == p.name.lower()]
+            city = "(?:" + "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True)) + ")"
             near = (rf"\b{city}\b\W+(?:\w+\W+){{0,4}}?(?:or|/|and|also)\W+(?:\w+\W+){{0,3}}?remote|"
                     rf"remote\W+(?:\w+\W+){{0,4}}?(?:or|/|and|also)\W+(?:\w+\W+){{0,3}}?{city}\b")
             if re.search(near, text, re.I):
