@@ -97,3 +97,20 @@ def test_states_and_provinces_are_not_countries():
 def test_city_alias_or_remote():
     req = parse("Junior data analyst in New York or remote US. SQL, Excel, Tableau.")
     assert set(req.work_modes) == {"remote", "hybrid", "onsite"}
+
+
+def test_same_city_name_in_another_country():
+    from jobsearch.normalize import countries_in
+    nurse = parse("Registered nurse in Berlin, Germany.")
+    pa = job(title="Nurse Practitioner", location="East Berlin, Pennsylvania",
+             countries=countries_in("East Berlin, Pennsylvania"), description="nursing")
+    assert score(nurse, pa) is None
+
+
+def test_remote_of_unknown_region_ranks_below_a_known_match():
+    designer = parse("Product designer, Figma and user research, London or remote UK.")
+    vague = job(title="Product Designer", location="Flexible / Remote", work_mode="remote")
+    uk = job(title="Product Designer", url="https://x/2", location="Remote (UK)", work_mode="remote",
+             remote_regions=["GB"])
+    a, b = score(designer, vague), score(designer, uk)
+    assert a and b and b.score > a.score and a.warnings
