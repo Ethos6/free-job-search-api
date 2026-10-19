@@ -143,6 +143,15 @@ def parse(text: str) -> Requirements:
             places.append(home)
     req.places = [p for p in places if p.country not in {x.country for x in excluded_places} or p.kind != "country"]
     req.work_modes = _work_modes(text)
+    if req.work_modes == ["remote"] and not REMOTE_ONLY.search(text) and any(p.kind == "city" for p in req.places):
+        # "London or remote UK", "Berlin, remote is fine": a city named next to remote means both are fine
+        for p in (p for p in req.places if p.kind == "city"):
+            city = re.escape(p.name)
+            near = (rf"\b{city}\b\W+(?:\w+\W+){{0,4}}?(?:or|/|and|also)\W+(?:\w+\W+){{0,3}}?remote|"
+                    rf"remote\W+(?:\w+\W+){{0,4}}?(?:or|/|and|also)\W+(?:\w+\W+){{0,3}}?{city}\b")
+            if re.search(near, text, re.I):
+                req.work_modes = ["remote", "hybrid", "onsite"]
+                break
 
     # level
     req.years_experience = _years(text)

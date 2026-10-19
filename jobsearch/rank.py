@@ -108,19 +108,23 @@ def place_fit(req: Requirements, job: Job) -> tuple[Optional[float], Optional[st
     if mode == "remote":
         if wanted_modes and "remote" not in wanted_modes and not (job.countries and want_countries & set(job.countries)):
             return None, None, None  # they want office/hybrid only
-        allowed = set(job.remote_regions)
-        check = {home} if home else (want_countries if req.remote_only or not req.places else set())
+        allowed = set(job.remote_regions) or (set(job.countries) if job.countries and job.source != "remotive"
+                                              and not req.remote_only else set())
+        check = {home} if home else want_countries
         if allowed and check and not (allowed & check):
             return None, None, None  # remote, but only for people living elsewhere
         if allowed and not check:
             return 0.8, "Remote", f"Remote only for people in: {_names(allowed)}"
         where = f" ({_names(allowed)})" if allowed and len(allowed) <= 6 else " (worldwide)" if not allowed else ""
-        return 1.0, f"Remote{where}", None
+        fit = 1.0 if (not wanted_modes or "remote" in wanted_modes) else 0.7
+        return fit, f"Remote{where}", None
 
     # on-site, hybrid or unknown
     if req.remote_only:
         if mode in ("onsite", "hybrid"):
             return None, None, None
+        if job.countries and (home or want_countries) and not (set(job.countries) & ({home} | want_countries)):
+            return None, None, None  # probably an office job in another country
         return 0.3, None, "Work mode not stated; may not be remote"
     if wanted_modes and mode and mode not in wanted_modes:
         if not (mode == "hybrid" and "onsite" in wanted_modes):
@@ -334,7 +338,11 @@ def score(req: Requirements, job: Job, fx: Optional[dict] = None,
     if job.from_search_snippet:
         warnings.append("Details not read; open the link to check")
 
-    total = 35 * t + 25 * sk + 15 * pf + 10 * sf + 10 * pay + 5 * fresh
+    other_lang = _title_language_conflict(req, job)
+    if other_lang:
+        warnings.append(f"Title asks for {vocab.display(other_lang)}")
+
+    total = 35 * t + 25 * sk + 15 * pf + 10 * sf + 10 * pay + 5 * fresh - (12 if other_lang else 0)
     if req.keywords and any(r.startswith("Matches ") for r in reasons):
         total += 3
     if job.from_search_snippet:
@@ -343,8 +351,51 @@ def score(req: Requirements, job: Job, fx: Optional[dict] = None,
     return Match(job=job, score=round(max(0.0, min(100.0, total)), 1), reasons=reasons, warnings=warnings)
 
 
+LANGUAGES = {"python", "java", "javascript", "typescript", "go", "rust", "c++", "c#", "ruby", "php", "kotlin",
+             "swift", "scala", "elixir", "dart", ".net", "rails", "node.js", "react", "angular", "vue", "django",
+             "laravel", "spring", "flutter", "android", "ios"}
+
+
+def _title_language_conflict(req: Requirements, job: Job) -> Optional[str]:
+    """'Backend Engineer (Ruby)' for someone who asked for Python -> 'ruby'."""
+    mine = {s for s in req.skills + req.nice_skills if s in LANGUAGES}
+    if not mine:
+        return None
+    in_title = [s for s in vocab.find_skills(job.title) if s in LANGUAGES]
+    if in_title and not (set(in_title) & mine):
+        return in_title[0]
+    return None
+
+
+def _same_role(m: Match) -> str:
+    j = m.job
+    title = re.sub(r"\s*[-–|,(].*$", "", j.title.lower()).strip()
+    return f"{re.sub(r'[^a-z0-9]', '', j.company.lower())}|{title}"
+
+
 def rank(req: Requirements, jobs: list[Job], fx: Optional[dict] = None, limit: int = 25) -> tuple[list[Match], int]:
     now = datetime.now(timezone.utc)
     matches = [m for m in (score(req, j, fx, now) for j in jobs) if m is not None]
     matches.sort(key=lambda m: (m.score, m.job.posted_at.timestamp() if m.job.posted_at else 0), reverse=True)
-    return matches[:limit], len(matches)
+    # one result per company + role (companies often post the same job once per country),
+    # and at most two results per company near the top, so one employer can't fill the list
+    out: list[Match] = []
+    seen: dict[str, Match] = {}
+    per_company: dict[str, int] = {}
+    later: list[Match] = []
+    for m in matches:
+        key = _same_role(m)
+        if key in seen:
+            first = seen[key]
+            if len(first.job.also_on) < 6 and m.job.url != first.job.url:
+                first.job.also_on.append({"source": m.job.location or m.job.source_name, "url": m.job.url})
+            continue
+        seen[key] = m
+        company = re.sub(r"[^a-z0-9]", "", m.job.company.lower())
+        if company and per_company.get(company, 0) >= 2:
+            later.append(m)
+            continue
+        per_company[company] = per_company.get(company, 0) + 1
+        out.append(m)
+    out += later
+    return out[:limit], len(seen)
