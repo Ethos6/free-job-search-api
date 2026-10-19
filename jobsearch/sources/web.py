@@ -199,7 +199,7 @@ class WebSearch(Source):
     homepage = "https://github.com/Ethos6/free-search-api"
     terms = "Uses your own FreeSearch API (JOBS_SEARCH_URL) or the freesearch library."
     max_pages = 8
-    max_new_boards = 6
+    max_new_boards = 3
 
     def available(self, ctx: Context) -> Optional[str]:
         reason = super().available(ctx)

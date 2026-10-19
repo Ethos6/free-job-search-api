@@ -1,0 +1,57 @@
+"""Problems seen in the first run against the real job sources."""
+from jobsearch.models import Job
+from jobsearch.parse import parse
+from jobsearch.rank import rank, score
+
+
+def job(**kw):
+    base = dict(title="Product Designer", company="X", url="https://x/1", source="greenhouse",
+                description="Figma, user research")
+    base.update(kw)
+    return Job(**base)
+
+
+def test_city_or_remote_is_not_remote_only():
+    req = parse("Product designer, Figma and user research, London or remote UK.")
+    assert set(req.work_modes) == {"remote", "hybrid", "onsite"}
+    assert score(req, job(location="London, UK", countries=["GB"])) is not None
+    assert score(req, job(location="San Francisco Bay Area", countries=["US"])) is None
+
+
+def test_remote_only_still_respects_country():
+    req = parse("Python developer, fully remote. I live in India.")
+    assert score(req, job(title="Python Developer", location="Austin, TX", countries=["US"], description="Python")) is None
+
+
+def test_remote_jobs_for_other_countries_are_dropped():
+    req = parse("Registered nurse in Berlin, Germany. I speak English and German.")
+    us_only = job(title="Triage Nurse (Remote)", location="United States", work_mode="remote", remote_regions=["US"],
+                  description="nursing")
+    assert score(req, us_only) is None
+    germany = job(title="Telehealth Nurse", location="Remote, Germany", work_mode="remote", remote_regions=["DE"],
+                  description="nursing")
+    assert score(req, germany) is not None
+
+
+def test_other_language_in_title_is_pushed_down():
+    req = parse("Senior backend developer, Python and Django. Remote in Europe.")
+    ruby = job(title="Senior Backend Engineer (Ruby)", location="Remote, Poland", work_mode="remote",
+               remote_regions=["PL"], description="Ruby on Rails, some Python")
+    py = job(title="Senior Backend Engineer (Python)", url="https://x/2", location="Remote, Poland", work_mode="remote",
+             remote_regions=["PL"], description="Python, Django")
+    a, b = score(req, ruby), score(req, py)
+    assert "Title asks for Ruby" in a.warnings and b.score > a.score + 10
+
+
+def test_repeats_collapse_and_one_company_cannot_fill_the_list():
+    req = parse("Machine learning engineer, PyTorch, remote")
+    jobs = [job(title="Machine Learning Engineer", company="GitLab", url=f"https://x/{c}", location=f"Remote, {c}",
+                work_mode="remote", description="PyTorch") for c in ("Poland", "Spain", "UK")]
+    jobs += [job(title=f"ML Engineer {i}", company="Jobgether", url=f"https://y/{i}", work_mode="remote",
+                 description="PyTorch machine learning") for i in range(5)]
+    jobs += [job(title="Machine Learning Engineer", company="Acme", url="https://z/1", work_mode="remote",
+                 description="PyTorch")]
+    out, total = rank(req, jobs, limit=5)
+    companies = [m.job.company for m in out]
+    assert companies.count("GitLab") == 1 and len(out[companies.index("GitLab")].job.also_on) == 2
+    assert companies[:4].count("Jobgether") <= 2 and "Acme" in companies
