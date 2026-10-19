@@ -211,7 +211,7 @@ All optional. See [`.env.example`](.env.example).
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                      # 105 tests, no internet needed
+pytest -q                      # 107 tests, no internet needed
 python scripts/live_check.py   # searches the real sources (needs internet)
 ```
 
