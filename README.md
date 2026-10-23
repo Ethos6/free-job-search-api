@@ -91,6 +91,19 @@ curl -s localhost:8000/v1/search/cv -F cv=@my_cv.pdf -F location="remote" \
 logged or sent to job sites. Only short search words (like "data engineer python Bengaluru") leave the
 server, and the CV text is not echoed back. If you turn on an outside AI service, the CV goes to that service.
 
+## How it works
+
+A search request is normalized into job criteria, then the configured public sources are queried. Results are deduplicated and ranked with the matching evidence before the API returns source links. CV searches use the same matching path after extracting relevant skills and preferences.
+
+```mermaid
+flowchart TD
+    A[Search text or CV] --> B[Extract job criteria]
+    B --> C[Query configured job sources]
+    C --> D[Normalize and deduplicate results]
+    D --> E[Rank matches and explain signals]
+    E --> F[Return jobs with source links]
+```
+
 ## Quick start
 
 **Docker Compose (recommended, includes your own web search engine)**
